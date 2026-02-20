@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Escape Review Mobile",
+    "slug": "escape-review-mobile",
+    "scheme": "escapereview",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.escape.review.mobile"
+    },
+    "android": {
+      "package": "com.escape.review.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

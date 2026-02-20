@@ -1,0 +1,154 @@
+# Architecture
+
+## System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Clients                                  │
+│  ┌─────────────────────┐      ┌─────────────────────────────┐   │
+│  │  Web (Next.js 14)   │      │  Mobile (Expo React Native)  │   │
+│  │  apps/web           │      │  apps/mobile                 │   │
+│  └──────────┬──────────┘      └──────────────┬──────────────┘   │
+└─────────────┼────────────────────────────────┼──────────────────┘
+              │ HTTPS REST + JWT                │
+              ▼                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Backend (NestJS)                              │
+│                    apps/api  :3000                               │
+│                                                                  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │
+│  │  Auth    │ │  Stores  │ │  Reviews │ │  Bookmarks/Likes │  │
+│  │  Module  │ │  Module  │ │  Module  │ │  Module          │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘  │
+│  ┌──────────┐ ┌──────────────────────────────────────────────┐  │
+│  │  Slots   │ │  Search Module (full-text via PostgreSQL)     │  │
+│  │  Module  │ └──────────────────────────────────────────────┘  │
+│  └──────────┘                                                    │
+│                    pg (node-postgres) Pool                        │
+└─────────────┬───────────────────────────────┬───────────────────┘
+              │                               │
+              ▼                               ▼
+┌─────────────────────┐          ┌────────────────────────┐
+│   PostgreSQL         │          │   Redis                │
+│   (primary DB)       │          │   (sessions, cache,    │
+│                      │          │    rate limiting)      │
+└─────────────────────┘          └────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                   External Services                              │
+│  ┌──────────────────┐   ┌──────────────────────────────────┐   │
+│  │  Google OAuth 2.0 │   │  Cloudflare R2 (image storage)  │   │
+│  └──────────────────┘   └──────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Monorepo Workspace Layout
+
+```
+escape-review/
+├── apps/
+│   ├── api/                    # NestJS backend
+│   │   ├── src/
+│   │   │   ├── auth/
+│   │   │   ├── users/
+│   │   │   ├── regions/
+│   │   │   ├── stores/
+│   │   │   ├── themes/
+│   │   │   ├── reviews/
+│   │   │   ├── slots/
+│   │   │   ├── bookmarks/
+│   │   │   ├── likes/
+│   │   │   └── search/
+│   │   ├── src/database/
+│   │   │   ├── migrations/       # numbered .sql files
+│   │   │   ├── database.service.ts
+│   │   │   └── seed.ts
+│   │   └── package.json
+│   │
+│   ├── web/                    # Next.js 14 App Router
+│   │   ├── app/
+│   │   │   ├── (auth)/         # login, register pages
+│   │   │   ├── (main)/         # home, explore, search
+│   │   │   ├── stores/[id]/    # store detail
+│   │   │   ├── themes/[id]/    # theme detail + reviews
+│   │   │   └── profile/        # user profile, bookmarks
+│   │   ├── components/
+│   │   ├── lib/
+│   │   └── package.json
+│   │
+│   └── mobile/                 # Expo + React Native
+│       ├── app/                # Expo Router file-based routing
+│       │   ├── (tabs)/
+│       │   │   ├── index.tsx   # Home
+│       │   │   ├── explore.tsx
+│       │   │   └── profile.tsx
+│       │   └── theme/[id].tsx
+│       ├── components/
+│       └── package.json
+│
+├── packages/
+│   ├── types/                  # @escape/types
+│   │   └── src/
+│   │       ├── user.ts
+│   │       ├── store.ts
+│   │       ├── theme.ts
+│   │       ├── review.ts
+│   │       └── index.ts
+│   └── utils/                  # @escape/utils
+│       └── src/
+│           ├── format.ts       # date/number formatting
+│           ├── validate.ts     # shared validators
+│           └── index.ts
+│
+├── agents/
+├── docs/
+├── turbo.json
+└── package.json
+```
+
+## API Design
+
+- **Base URL**: `/api/v1`
+- **Auth**: `Authorization: Bearer <jwt_token>`
+- **Response envelope**:
+  ```json
+  {
+    "data": {},
+    "meta": { "page": 1, "total": 100 },
+    "error": null
+  }
+  ```
+- **Pagination**: cursor-based for feeds, offset-based for admin lists
+
+## Auth Flow
+
+```
+1. User clicks "Google로 로그인"
+2. Browser redirects → Google OAuth consent screen
+3. Google callback → POST /api/v1/auth/google/callback
+4. Server creates/updates User record
+5. Server issues JWT (access: 1h, refresh: 30d)
+6. Client stores JWT in httpOnly cookie (web) / SecureStore (mobile)
+```
+
+## Image Upload Flow
+
+```
+1. Client requests presigned URL → GET /api/v1/upload/presign?type=review
+2. Server returns { uploadUrl, fileKey }
+3. Client uploads directly to Cloudflare R2 via presigned URL
+4. Client sends fileKey to API (e.g., POST /reviews with imageKeys[])
+5. Server stores R2 public URL in DB
+```
+
+## Caching Strategy
+
+| Data | Cache | TTL |
+|---|---|---|
+| Region list | Redis | 1 hour |
+| Store detail | Redis | 15 min |
+| Theme detail | Redis | 15 min |
+| Review feed | Redis | 2 min |
+| Available slots | Redis | 30 sec |
+
+Cache invalidated on write via NestJS event emitter.

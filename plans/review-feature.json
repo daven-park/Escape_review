@@ -1,0 +1,32 @@
+[
+  {
+    "agent": "database",
+    "task": "reviews, likes 테이블 마이그레이션 SQL 파일을 apps/api/src/database/migrations/ 에 생성해줘. docs/data-models.md의 DDL 기준으로.",
+    "parallel": false
+  },
+  {
+    "agent": "backend",
+    "task": "apps/api/src/reviews 모듈 생성. POST/GET/PATCH/DELETE /api/v1/reviews 엔드포인트. ReviewsRepository에서 DatabaseService로 raw SQL 사용. JWT 인증 필수.",
+    "parallel": false
+  },
+  {
+    "agent": "backend",
+    "task": "apps/api/src/upload 모듈에 GET /api/v1/upload/presign?type=review 엔드포인트 추가. Cloudflare R2 presigned URL 반환.",
+    "parallel": false
+  },
+  {
+    "agent": "frontend-web",
+    "task": "apps/web/app/themes/[id]/review/page.tsx 구현. React Hook Form + Zod. 별점(0.5단위), 텍스트(최소 20자), 이미지 업로드(최대 5장, R2 presigned URL 사용), 난이도 선택, 날짜, 스포일러 토글.",
+    "parallel": true
+  },
+  {
+    "agent": "frontend-mobile",
+    "task": "apps/mobile/app/review/[id].tsx 구현. expo-image-picker로 이미지 선택 + R2 직접 업로드. NativeWind 스타일링.",
+    "parallel": true
+  },
+  {
+    "agent": "tester",
+    "task": "reviews 기능 테스트 작성: apps/api/src/reviews/reviews.service.spec.ts (ReviewsRepository mock), apps/api/test/reviews.e2e-spec.ts, apps/web/__tests__/ReviewCard.test.tsx",
+    "parallel": false
+  }
+]

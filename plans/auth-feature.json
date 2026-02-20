@@ -1,0 +1,27 @@
+[
+  {
+    "agent": "database",
+    "task": "users 테이블 마이그레이션 SQL 파일 생성. docs/data-models.md의 users DDL 기준. gen_random_uuid() 사용.",
+    "parallel": false
+  },
+  {
+    "agent": "backend",
+    "task": "apps/api/src/auth 모듈 구현. Google OAuth (passport-google-oauth20) + 이메일/비밀번호 로그인. JWT access token(1h) + refresh token(30d). POST /auth/login, /auth/register, /auth/refresh, /auth/logout.",
+    "parallel": false
+  },
+  {
+    "agent": "frontend-web",
+    "task": "apps/web/app/(auth)/login/page.tsx 구현. Google 로그인 버튼 + 이메일/비밀번호 폼. shadcn/ui 사용.",
+    "parallel": true
+  },
+  {
+    "agent": "frontend-mobile",
+    "task": "apps/mobile/app/(auth)/login.tsx 구현. Google OAuth (expo-auth-session) + 이메일 로그인. JWT를 expo-secure-store에 저장.",
+    "parallel": true
+  },
+  {
+    "agent": "tester",
+    "task": "auth 기능 테스트: apps/api/src/auth/auth.service.spec.ts, apps/api/test/auth.e2e-spec.ts",
+    "parallel": false
+  }
+]

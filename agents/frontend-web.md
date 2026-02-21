@@ -176,7 +176,7 @@ NEXT_PUBLIC_GA_ID=G-...
 
 ```bash
 # main 최신화 후 작업 브랜치 생성
-git checkout main && git pull origin main
+git checkout develop && git pull origin develop
 git checkout -b <type>/web/<kebab-description>
 ```
 
@@ -238,7 +238,7 @@ gh pr create \
 🤖 Generated with [Claude Code](https://claude.ai/claude-code)
 PR
   )" \
-  --base main
+  --base develop
 ```
 
 ### 5단계: PR 리뷰 에이전트 실행

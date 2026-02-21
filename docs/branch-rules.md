@@ -1,5 +1,26 @@
 # 브랜치 규칙 및 Git 워크플로우
 
+## Git Flow 전략
+
+```
+main        ← 운영(production) 전용. develop → main PR로만 반영
+  └─ develop      ← 개발 통합 브랜치. feature → develop PR로만 반영
+       ├─ feat/<scope>/<name>     ← 에이전트 기능 구현
+       ├─ fix/<scope>/<name>      ← 에이전트 버그 수정
+       ├─ refactor/<scope>/<name> ← 에이전트 리팩토링
+       └─ test/<scope>/<name>     ← 에이전트 테스트 추가
+```
+
+### 브랜치 역할
+
+| 브랜치 | 역할 | 직접 push | PR 대상 |
+|---|---|---|---|
+| `main` | 운영 배포 | 🚫 금지 | develop → main (릴리즈) |
+| `develop` | 개발 통합 | 🚫 금지 | feature → develop (기능 반영) |
+| `feat/*` | 기능 구현 | ✅ 에이전트 작업 | develop |
+
+---
+
 ## 브랜치 네이밍 규칙
 
 ```
@@ -33,36 +54,39 @@
 ## 전체 워크플로우
 
 ```
-main (보호됨)
-  └─ feat/api/review-crud   ← 에이전트가 작업
-       ├─ commit: feat(api): create review CRUD endpoints
-       ├─ push → GitHub
-       ├─ gh pr create → PR #5 생성
-       ├─ 리뷰 에이전트 실행 → PR 코멘트 작성
-       └─ 사용자가 GitHub에서 직접 Merge
+[에이전트 작업]
+  develop 최신화
+    └─ feat/api/review-crud 생성
+         ├─ 구현 → commit
+         ├─ push → GitHub
+         ├─ PR #N 생성 (base: develop)
+         ├─ 리뷰 에이전트 → PR 코멘트
+         └─ 사용자가 develop으로 Merge ✅
+
+[릴리즈]
+  develop → main PR (사용자가 직접)
+    └─ 운영 배포
 ```
 
-### 단계별 흐름
+### 단계별 흐름 (에이전트 기준)
 
-1. **에이전트 작업 시작** → `git checkout main && git pull && git checkout -b feat/api/<name>`
-2. **구현 완료** → `git add <files> && git commit -m "feat(api): ..."`
+1. **브랜치 생성** → `git checkout develop && git pull origin develop && git checkout -b feat/<scope>/<name>`
+2. **구현 완료** → `git add <files> && git commit -m "feat(<scope>): ..."`
 3. **원격 푸시** → `git push -u origin $(git branch --show-current)`
-4. **PR 생성** → `gh pr create --title "..." --base main`
+4. **PR 생성** → `gh pr create --title "..." --base develop`
 5. **리뷰 에이전트** → SOLID·클린코드 검토 후 `gh pr review` 코멘트 자동 작성
-6. **CI 자동 실행** → GitHub Actions: test-api, test-web, type-check, build
-7. **사용자 머지** → 리뷰 확인 후 GitHub에서 직접 Squash & Merge
+6. **CI 자동 실행** → GitHub Actions: test, type-check, build
+7. **사용자 머지** → 리뷰 확인 후 GitHub에서 직접 Squash & Merge → develop
 
 ---
 
 ## GitHub 브랜치 보호 규칙
 
-`scripts/setup-branch-protection.sh` 를 실행해 자동 설정:
-
 ```bash
 bash scripts/setup-branch-protection.sh
 ```
 
-### main 브랜치 보호 규칙 (자동 설정됨)
+### main 브랜치 보호 (운영 보호)
 
 | 규칙 | 설정값 |
 |---|---|
@@ -71,7 +95,15 @@ bash scripts/setup-branch-protection.sh
 | 필수 CI 체크 | test-api, test-web, type-check |
 | 오래된 리뷰 자동 무효화 | ✅ |
 | 강제 push 금지 | ✅ |
-| 브랜치 삭제 금지 | ✅ |
+
+### develop 브랜치 보호 (개발 통합 보호)
+
+| 규칙 | 설정값 |
+|---|---|
+| PR 없이 직접 push 금지 | ✅ |
+| 필요 승인 수 | 1명 |
+| 필수 CI 체크 | test-api, test-web, type-check |
+| 강제 push 금지 | ✅ |
 
 ---
 
@@ -81,20 +113,6 @@ bash scripts/setup-branch-protection.sh
 <type>(<scope>): <한 줄 요약>
 
 - <변경 사항 상세>
-- <변경 사항 상세>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-```
-
-### 예시
-
-```
-feat(api): add review CRUD endpoints with image upload
-
-- POST /api/v1/reviews - create review with images[]
-- GET /api/v1/reviews?themeId=xxx - paginated list
-- PATCH /api/v1/reviews/:id - update (owner only)
-- DELETE /api/v1/reviews/:id - soft delete
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
@@ -103,18 +121,16 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 ## PR 제목 규칙
 
-PR 제목은 커밋 메시지 첫 줄과 동일하게:
-
 ```
-feat(api): add review CRUD endpoints with image upload
-fix(web): resolve login redirect loop on OAuth callback
-refactor(api): extract token issuance logic to AuthTokenService
+feat(api): add review CRUD endpoints with image upload   → develop
+fix(web): resolve login redirect loop on OAuth callback  → develop
+release: v1.2.0                                          → main (릴리즈)
 ```
 
 ---
 
 ## Merge 전략
 
-- **Squash & Merge** 사용 (feature 브랜치의 여러 커밋을 하나로)
-- Merge 후 브랜치 자동 삭제 (GitHub Settings에서 설정)
-- main에는 항상 녹색(CI 통과) 커밋만 존재
+- **feature → develop**: Squash & Merge (feature 커밋 하나로 정리)
+- **develop → main**: Merge commit (릴리즈 히스토리 보존)
+- Merge 후 feature 브랜치 자동 삭제

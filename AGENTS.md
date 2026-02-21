@@ -92,22 +92,30 @@ packages/utils → Shared utils (agents/backend.md or orchestrator)
 
 ---
 
-## Git 워크플로우 (모든 에이전트 공통)
+## Git Flow 전략
+
+```
+main        ← 운영(production) 전용. develop → main PR로만 반영
+  └─ develop      ← 개발 통합. feature → develop PR로만 반영
+       └─ feat/<scope>/<name>   ← 에이전트 기능 구현 브랜치
+```
 
 > 상세 규칙: `docs/branch-rules.md`
 
-각 에이전트는 **반드시** 아래 순서로 작업을 마무리한다:
+**에이전트는 항상 `develop` 기준으로 브랜치를 생성하고 PR을 올린다. `main`에는 절대 직접 PR하지 않는다.**
 
 ```
-1. git checkout main && git pull origin main
+1. git checkout develop && git pull origin develop
 2. git checkout -b <type>/<scope>/<kebab-description>
 3. (구현 작업)
 4. git add <변경 파일만> && git commit -m "..."
 5. git push -u origin $(git branch --show-current)
-6. gh pr create --base main
+6. gh pr create --base develop
 7. 리뷰 에이전트 실행 (아래 참고)
-8. → 사용자가 GitHub에서 직접 Merge
+8. → 사용자가 GitHub에서 직접 Merge → develop
 ```
+
+릴리즈: 사용자가 `develop → main` PR을 직접 생성·머지
 
 ### 브랜치 네이밍
 

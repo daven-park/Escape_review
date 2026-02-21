@@ -10,23 +10,11 @@ set -euo pipefail
 
 OWNER="daven-park"
 REPO="Escape_review"
-BRANCH="main"
 
-echo "🔒 Setting up branch protection for ${OWNER}/${REPO}:${BRANCH} ..."
-
-# ─── main 브랜치 보호 규칙 ────────────────────────────────────────────────────
-gh api \
-  --method PUT \
-  "repos/${OWNER}/${REPO}/branches/${BRANCH}/protection" \
-  --input - << 'JSON'
-{
+PROTECTION_PAYLOAD='{
   "required_status_checks": {
     "strict": true,
-    "contexts": [
-      "test-api",
-      "test-web",
-      "type-check"
-    ]
+    "contexts": ["test-api", "test-web", "type-check"]
   },
   "enforce_admins": false,
   "required_pull_request_reviews": {
@@ -39,12 +27,25 @@ gh api \
   "allow_deletions": false,
   "required_linear_history": false,
   "required_conversation_resolution": true
-}
-JSON
+}'
 
-echo "✅ Branch protection applied to '${BRANCH}'"
+# ─── main 브랜치 보호 (운영 보호) ────────────────────────────────────────────
+echo "🔒 Protecting main branch ..."
+echo "$PROTECTION_PAYLOAD" | gh api \
+  --method PUT \
+  "repos/${OWNER}/${REPO}/branches/main/protection" \
+  --input -
+echo "✅ main: PR required (1 approval) + CI must pass"
 
-# ─── PR 머지 후 브랜치 자동 삭제 설정 ──────────────────────────────────────────
+# ─── develop 브랜치 보호 (개발 통합 보호) ────────────────────────────────────
+echo "🔒 Protecting develop branch ..."
+echo "$PROTECTION_PAYLOAD" | gh api \
+  --method PUT \
+  "repos/${OWNER}/${REPO}/branches/develop/protection" \
+  --input - 2>/dev/null || echo "⚠️  develop branch not found — push it first: git push origin develop"
+echo "✅ develop: PR required (1 approval) + CI must pass"
+
+# ─── 레포 Merge 설정 ─────────────────────────────────────────────────────────
 gh api \
   --method PATCH \
   "repos/${OWNER}/${REPO}" \
@@ -53,11 +54,10 @@ gh api \
   --field squash_merge_commit_message=BLANK \
   > /dev/null
 
-echo "✅ Auto-delete branch on merge: enabled"
-echo "✅ Squash merge commit title: PR title"
 echo ""
-echo "🎉 Done! Branch rules:"
-echo "   • main: PR required (1 approval)"
-echo "   • main: CI must pass (test-api, test-web, type-check)"
-echo "   • main: No direct push, no force push, no deletion"
-echo "   • Feature branches: auto-deleted after merge"
+echo "🎉 Done! Git Flow branch rules:"
+echo "   main    : PR required (1 approval), CI must pass, no direct push"
+echo "   develop : PR required (1 approval), CI must pass, no direct push"
+echo "   feature : auto-deleted after merge (Squash & Merge → develop)"
+echo ""
+echo "Flow: feat/* → develop (PR) → main (release PR)"

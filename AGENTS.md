@@ -92,36 +92,59 @@ packages/utils → Shared utils (agents/backend.md or orchestrator)
 
 ---
 
-## Git Workflow (모든 에이전트 공통)
+## Git 워크플로우 (모든 에이전트 공통)
 
-각 에이전트는 작업 완료 후 **반드시** 커밋을 생성한다.
+> 상세 규칙: `docs/branch-rules.md`
+
+각 에이전트는 **반드시** 아래 순서로 작업을 마무리한다:
 
 ```
-feat(<scope>): <요약>     → 새 기능
-fix(<scope>): <요약>      → 버그 수정
-refactor(<scope>): <요약> → 리팩토링 (동작 변경 없음)
-test(<scope>): <요약>     → 테스트 추가/수정
-chore(<scope>): <요약>    → 빌드/설정 변경
+1. git checkout main && git pull origin main
+2. git checkout -b <type>/<scope>/<kebab-description>
+3. (구현 작업)
+4. git add <변경 파일만> && git commit -m "..."
+5. git push -u origin $(git branch --show-current)
+6. gh pr create --base main
+7. 리뷰 에이전트 실행 (아래 참고)
+8. → 사용자가 GitHub에서 직접 Merge
 ```
 
-scope 예시: `api`, `web`, `mobile`, `db`, `types`
+### 브랜치 네이밍
+
+`<type>/<scope>/<kebab-description>`
+
+| 타입 | 시기 | scope |
+|---|---|---|
+| `feat` | 새 기능 | `api` / `web` / `mobile` / `db` / `types` |
+| `fix` | 버그 수정 | 동일 |
+| `refactor` | 리팩토링 | 동일 |
+| `test` | 테스트 | 동일 |
+| `chore` | 빌드·설정·마이그레이션 | 동일 |
 
 ## PR Review Workflow
 
-PR 생성 후 리뷰 에이전트 실행:
+PR 생성 직후 리뷰 에이전트를 실행한다:
 
 ```bash
-AGENT=$(cat agents/reviewer.md)
-PR_NUMBER=<PR 번호>
+PR_NUMBER=$(gh pr view --json number -q '.number')
+REVIEWER=$(cat agents/reviewer.md)
 codex exec --full-auto --skip-git-repo-check -C $(pwd) \
-  "${AGENT}
+  "${REVIEWER}
 
 ## 지금 수행할 작업
-PR #${PR_NUMBER} 를 리뷰해줘. SOLID 원칙과 클린코드 기준으로 검토 후
-gh pr review 로 코멘트를 작성해줘."
+PR #${PR_NUMBER} 를 리뷰해줘. gh pr diff 로 변경사항을 확인하고,
+SOLID 원칙과 클린코드 기준으로 검토한 후 gh pr review 로 코멘트를 작성해줘."
 ```
 
-## How to Use Other Agents
+## 브랜치 보호 규칙 초기 설정
+
+```bash
+bash scripts/setup-branch-protection.sh
+```
+
+main 브랜치: PR 필수(승인 1명) + CI 통과 필수 + 직접 push 금지
+
+## How to Use Agents
 
 ```bash
 AGENT=$(cat agents/backend.md)

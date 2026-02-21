@@ -420,22 +420,92 @@ if (keys.length > 0) await this.redis.del(...keys);
 
 ---
 
-## 작업 완료 후 Git 커밋
+## 작업 완료 후 Git 워크플로우
+
+**선택이 아닌 필수다. 브랜치 → 커밋 → 푸시 → PR → 리뷰 순서로 마무리한다.**
+
+### 1단계: 브랜치 생성
 
 ```bash
-# 마이그레이션/스키마 변경 커밋
+# main 최신화 후 작업 브랜치 생성
+git checkout main && git pull origin main
+git checkout -b <type>/db/<kebab-description>
+```
+
+**브랜치 네이밍** — `<type>/<scope>/<kebab-case-description>`
+
+| 타입 | 사용 시기 |
+|---|---|
+| `feat` | 새 기능 추가 |
+| `fix` | 버그 수정 |
+| `refactor` | 동작 변경 없는 리팩토링 |
+| `test` | 테스트만 추가/수정 |
+| `chore` | 빌드·설정·마이그레이션 변경 |
+
+scope: `api` | `web` | `mobile` | `db` | `types`
+
+**예시**: `chore/db/add-price-column`, `feat/db/create-notifications-table`
+
+### 2단계: 커밋
+
+```bash
+# 변경된 파일만 스테이징 (git add . 금지)
 git add apps/api/src/database/migrations/ apps/api/src/database/seed.ts docs/data-models.md
 
 git commit -m "$(cat <<'COMMIT'
-chore(db): <마이그레이션 요약>
+chore(db): <한 줄 요약>
 
-- <추가/변경된 테이블/컬럼>
+- <변경 사항 1>
+- <변경 사항 2>
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 COMMIT
 )"
 ```
 
-### 커밋 규칙
-- 마이그레이션 파일은 절대 수정 금지 (append-only) — 수정이 필요하면 새 마이그레이션 파일 생성
-- 마이그레이션 번호는 순서대로 증가 (`008_`, `009_`, ...)
+**절대 커밋 금지**: `.env`, `node_modules/`
+- 마이그레이션 파일은 절대 수정 금지 (append-only) — 수정 필요시 새 마이그레이션 생성
+
+### 3단계: 푸시
+
+```bash
+git push -u origin $(git branch --show-current)
+```
+
+### 4단계: PR 생성
+
+```bash
+gh pr create \
+  --title "chore(db): <제목>" \
+  --body "$(cat <<'PR'
+## 변경 사항
+
+- <변경 사항 1>
+- <변경 사항 2>
+
+## 테스트
+
+- [ ] 유닛 테스트 통과
+- [ ] 타입 체크 통과
+
+🤖 Generated with [Claude Code](https://claude.ai/claude-code)
+PR
+  )" \
+  --base main
+```
+
+### 5단계: PR 리뷰 에이전트 실행
+
+```bash
+PR_NUMBER=$(gh pr view --json number -q '.number')
+REVIEWER=$(cat agents/reviewer.md)
+codex exec --full-auto --skip-git-repo-check -C $(pwd) \
+  "${REVIEWER}
+
+## 지금 수행할 작업
+
+PR #${PR_NUMBER} 를 리뷰해줘. gh pr diff ${PR_NUMBER} 로 변경사항을 확인하고,
+SOLID 원칙과 클린코드 기준으로 검토한 후 gh pr review 로 코멘트를 작성해줘."
+```
+
+리뷰 완료 후 **사용자가 직접 GitHub에서 머지**한다.

@@ -168,20 +168,37 @@ NEXT_PUBLIC_GA_ID=G-...
 
 ---
 
-## 작업 완료 후 Git 커밋
+## 작업 완료 후 Git 워크플로우
 
-작업을 마친 후 반드시 아래 절차로 커밋을 생성해:
+**선택이 아닌 필수다. 브랜치 → 커밋 → 푸시 → PR → 리뷰 순서로 마무리한다.**
+
+### 1단계: 브랜치 생성
 
 ```bash
-# 1. 변경된 파일만 스테이징
-git add apps/web/<변경된 파일들>
+# main 최신화 후 작업 브랜치 생성
+git checkout main && git pull origin main
+git checkout -b <type>/web/<kebab-description>
+```
 
-# 2. Conventional Commits 형식으로 커밋
-# feat(web): 새 페이지/컴포넌트
-# fix(web): 버그 수정
-# refactor(web): 리팩토링
-# test(web): 테스트 추가/수정
-# style(web): 스타일(CSS/Tailwind) 변경
+**브랜치 네이밍** — `<type>/<scope>/<kebab-case-description>`
+
+| 타입 | 사용 시기 |
+|---|---|
+| `feat` | 새 기능 추가 |
+| `fix` | 버그 수정 |
+| `refactor` | 동작 변경 없는 리팩토링 |
+| `test` | 테스트만 추가/수정 |
+| `chore` | 빌드·설정·마이그레이션 변경 |
+
+scope: `api` | `web` | `mobile` | `db` | `types`
+
+**예시**: `feat/web/theme-detail-page`, `fix/web/login-redirect`, `style/web/navbar-mobile`
+
+### 2단계: 커밋
+
+```bash
+# 변경된 파일만 스테이징 (git add . 금지)
+git add apps/web/<파일들>
 
 git commit -m "$(cat <<'COMMIT'
 feat(web): <한 줄 요약>
@@ -194,7 +211,48 @@ COMMIT
 )"
 ```
 
-### 커밋 규칙
-- `.env`, `.env.local` 절대 커밋 금지
-- `dist/`, `.next/`, `node_modules/` 절대 커밋 금지
-- 페이지 + 관련 컴포넌트 + 훅을 같은 커밋에 포함
+**절대 커밋 금지**: `.env`, `.env.local`, `node_modules/`, `.next/`, `*.tsbuildinfo`
+
+### 3단계: 푸시
+
+```bash
+git push -u origin $(git branch --show-current)
+```
+
+### 4단계: PR 생성
+
+```bash
+gh pr create \
+  --title "feat(web): <제목>" \
+  --body "$(cat <<'PR'
+## 변경 사항
+
+- <변경 사항 1>
+- <변경 사항 2>
+
+## 테스트
+
+- [ ] 유닛 테스트 통과
+- [ ] 타입 체크 통과
+
+🤖 Generated with [Claude Code](https://claude.ai/claude-code)
+PR
+  )" \
+  --base main
+```
+
+### 5단계: PR 리뷰 에이전트 실행
+
+```bash
+PR_NUMBER=$(gh pr view --json number -q '.number')
+REVIEWER=$(cat agents/reviewer.md)
+codex exec --full-auto --skip-git-repo-check -C $(pwd) \
+  "${REVIEWER}
+
+## 지금 수행할 작업
+
+PR #${PR_NUMBER} 를 리뷰해줘. gh pr diff ${PR_NUMBER} 로 변경사항을 확인하고,
+SOLID 원칙과 클린코드 기준으로 검토한 후 gh pr review 로 코멘트를 작성해줘."
+```
+
+리뷰 완료 후 **사용자가 직접 GitHub에서 머지**한다.
